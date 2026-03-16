@@ -86,17 +86,6 @@ export async function exportRecordToPDF(record: SocialRecord): Promise<Blob | nu
       color: #6b7280;
       font-size: 12px;
     }
-    .images {
-      display: flex;
-      gap: 15px;
-      margin-top: 10px;
-    }
-    .images img {
-      max-width: 200px;
-      max-height: 200px;
-      border: 1px solid #e5e7eb;
-      border-radius: 8px;
-    }
   </style>
 </head>
 <body>
@@ -218,15 +207,6 @@ export async function exportRecordToPDF(record: SocialRecord): Promise<Blob | nu
       <span class="field-value">${record.referral}</span>
     </div>
   </div>
-
-  ${record.image_urls && record.image_urls.length > 0 ? `
-  <div class="section">
-    <div class="section-title">Imagens de Apoio</div>
-    <div class="images">
-      ${record.image_urls.map(url => `<img src="${url}" alt="Imagem de apoio">`).join('')}
-    </div>
-  </div>
-  ` : ''}
 
   <div class="footer">
     <p>Registro criado em: ${new Date(record.created_at).toLocaleString('pt-BR')}</p>

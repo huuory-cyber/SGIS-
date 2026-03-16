@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Filter, MapPin, Eye, Calendar, User } from 'lucide-react';
+import { Search, Filter, MapPin, Eye, Calendar, User, Image as ImageIcon } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -311,6 +311,31 @@ export default function RecordsTable({ records, isAdmin = false }: RecordsTableP
                   </div>
                 </div>
               </section>
+
+              {/* Images */}
+              {selectedRecord.image_urls && selectedRecord.image_urls.length > 0 && (
+                <section>
+                  <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Imagens de Apoio</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    {selectedRecord.image_urls.map((url, index) => (
+                      <div key={index} className="relative group">
+                        <img
+                          src={url}
+                          alt={`Imagem ${index + 1}`}
+                          className="w-full h-48 object-cover rounded-lg border border-slate-200"
+                          onClick={() => window.open(url, '_blank')}
+                        />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
+                          <ImageIcon className="text-white drop-shadow-lg" size={24} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-2">
+                    Clique na imagem para abrir em tamanho original
+                  </p>
+                </section>
+              )}
 
               {/* System Info */}
               <section className="pt-4 border-t border-slate-100">
