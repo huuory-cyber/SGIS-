@@ -3,13 +3,20 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "dev": "tsx server.ts",
     "start": "node server.ts",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "cf:dev": "wrangler pages dev -- npm run dev",
+    "cf:build": "vite build",
+    "cf:deploy": "npm run build && wrangler pages deploy dist --project-name=sgis-gestao-impacto-social",
+    "cf:deploy:prod": "npm run build && wrangler pages deploy dist --project-name=sgis-gestao-impacto-social --branch=main"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",

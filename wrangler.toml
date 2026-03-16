@@ -1,0 +1,35 @@
+# Cloudflare Pages configuration for SGIS project
+# This file is used by Cloudflare Pages to configure the deployment
+
+name = "sgis-gestao-impacto-social"
+compatibility_date = "2024-01-01"
+
+# Node.js version configuration
+[build]
+command = "npm run build"
+cwd = "."
+watch_paths = ["src/**", "index.html", "package.json", "vite.config.ts", "tsconfig.json"]
+
+# Specify Node.js version (Cloudflare Pages supports 16, 18, 20)
+# This project requires Node.js 20+ due to dependencies
+[build.environment_variables]
+NODE_VERSION = "20"
+
+# Site configuration
+[site]
+bucket = "dist"
+
+# Environment variables (configure these in Cloudflare dashboard or use wrangler secret)
+# VITE_SUPABASE_URL = "your-supabase-url"
+# VITE_SUPABASE_ANON_KEY = "your-supabase-anon-key"
+
+# KV namespaces (if needed for caching)
+# [[kv_namespaces]]
+# binding = "CACHE"
+# id = "your-kv-namespace-id"
+
+# D1 databases (if needed)
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "sgis-db"
+# database_id = "your-database-id"
