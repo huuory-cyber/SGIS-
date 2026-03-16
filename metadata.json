@@ -1,0 +1,5 @@
+{
+  "name": "SGIS - Gestão de Impacto Social",
+  "description": "Sistema centralizado para coleta de dados de assistência social, monitoramento em tempo real e relatórios automáticos de impacto.",
+  "requestFramePermissions": ["geolocation"]
+}
