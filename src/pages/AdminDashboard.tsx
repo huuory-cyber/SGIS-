@@ -418,7 +418,12 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 
-                <RecordsTable records={records} isAdmin={true} />
+                <RecordsTable
+                  records={records}
+                  isAdmin={true}
+                  onRecordUpdated={loadData}
+                  onRecordDeleted={loadData}
+                />
               </motion.div>
             )}
 

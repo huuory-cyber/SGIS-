@@ -236,7 +236,12 @@ export default function AgentDashboard() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
               >
-                <RecordsTable records={records} isAdmin={false} />
+                <RecordsTable
+                  records={records}
+                  isAdmin={false}
+                  onRecordUpdated={loadRecords}
+                  onRecordDeleted={loadRecords}
+                />
               </motion.div>
             )}
 

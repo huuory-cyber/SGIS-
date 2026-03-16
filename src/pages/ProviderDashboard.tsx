@@ -297,7 +297,12 @@ export default function ProviderDashboard() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
               >
-                <RecordsTable records={records} isAdmin={false} />
+                <RecordsTable
+                  records={records}
+                  isAdmin={false}
+                  onRecordUpdated={loadData}
+                  onRecordDeleted={loadData}
+                />
               </motion.div>
             )}
 

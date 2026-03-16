@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Filter, MapPin, Eye, Calendar, User, Image as ImageIcon } from 'lucide-react';
+import { Search, Filter, MapPin, Eye, Calendar, User, Image as ImageIcon, Edit, Trash2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -12,12 +12,16 @@ function cn(...inputs: ClassValue[]) {
 interface RecordsTableProps {
   records: SocialRecord[];
   isAdmin?: boolean;
+  onRecordUpdated?: () => void;
+  onRecordDeleted?: () => void;
 }
 
-export default function RecordsTable({ records, isAdmin = false }: RecordsTableProps) {
+export default function RecordsTable({ records, isAdmin = false, onRecordUpdated, onRecordDeleted }: RecordsTableProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSituation, setFilterSituation] = useState<string>('all');
   const [selectedRecord, setSelectedRecord] = useState<SocialRecord | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const filteredRecords = records.filter(record => {
     const matchesSearch = 
@@ -164,12 +168,30 @@ export default function RecordsTable({ records, isAdmin = false }: RecordsTableP
                     <p className="text-sm text-slate-500">{selectedRecord.age} anos</p>
                   </div>
                 </div>
-                <button 
-                  onClick={() => setSelectedRecord(null)}
-                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                >
-                  ✕
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    disabled={isDeleting}
+                    className="p-2 text-blue-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Editar registro"
+                  >
+                    <Edit size={20} />
+                  </button>
+                  <button
+                    onClick={() => setIsDeleting(true)}
+                    disabled={isEditing}
+                    className="p-2 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Deletar registro"
+                  >
+                    <Trash2 size={20} />
+                  </button>
+                  <button
+                    onClick={() => setSelectedRecord(null)}
+                    className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -354,6 +376,398 @@ export default function RecordsTable({ records, isAdmin = false }: RecordsTableP
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      {isDeleting && selectedRecord && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 className="text-red-500" size={32} />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">
+                Confirmar Deleção
+              </h3>
+              <p className="text-slate-600 mb-6">
+                Tem certeza que deseja deletar o registro de <strong>{selectedRecord.name}</strong>?
+                <br />
+                <span className="text-sm text-slate-500">Esta ação não pode ser desfeita.</span>
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setIsDeleting(false)}
+                  className="flex-1 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors font-medium"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      const { deleteRecord } = await import('../lib/supabase');
+                      await deleteRecord(selectedRecord.id);
+                      setSelectedRecord(null);
+                      setIsDeleting(false);
+                      onRecordDeleted?.();
+                    } catch (error) {
+                      console.error('Erro ao deletar registro:', error);
+                      alert('Erro ao deletar registro. Tente novamente.');
+                    }
+                  }}
+                  className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium"
+                >
+                  Deletar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {isEditing && selectedRecord && (
+        <EditRecordModal
+          record={selectedRecord}
+          onClose={() => setIsEditing(false)}
+          onSave={async (updatedData) => {
+            try {
+              const { updateRecord } = await import('../lib/supabase');
+              await updateRecord(selectedRecord.id, updatedData);
+              setSelectedRecord(null);
+              setIsEditing(false);
+              onRecordUpdated?.();
+            } catch (error) {
+              console.error('Erro ao atualizar registro:', error);
+              alert('Erro ao atualizar registro. Tente novamente.');
+            }
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Edit Record Modal Component
+interface EditRecordModalProps {
+  record: SocialRecord;
+  onClose: () => void;
+  onSave: (data: Partial<SocialRecord>) => Promise<void>;
+}
+
+function EditRecordModal({ record, onClose, onSave }: EditRecordModalProps) {
+  const [formData, setFormData] = useState<Partial<SocialRecord>>(record);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    try {
+      await onSave(formData);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full my-8 max-h-[90vh] overflow-y-auto">
+        <div className="p-6 border-b border-slate-100 sticky top-0 bg-white z-10">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xl font-bold text-slate-900">Editar Registro</h3>
+              <p className="text-sm text-slate-500">{record.name}</p>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Personal Information */}
+          <section>
+            <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Informações Pessoais</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Nome Completo</label>
+                <input
+                  type="text"
+                  value={formData.name || ''}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Data de Nascimento</label>
+                <input
+                  type="date"
+                  value={formData.birth_date || ''}
+                  onChange={(e) => setFormData({ ...formData, birth_date: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Idade</label>
+                <input
+                  type="number"
+                  value={formData.age || ''}
+                  onChange={(e) => setFormData({ ...formData, age: parseInt(e.target.value) })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Gênero</label>
+                <select
+                  value={formData.gender || ''}
+                  onChange={(e) => setFormData({ ...formData, gender: e.target.value as any })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Selecione</option>
+                  <option value="Masculino">Masculino</option>
+                  <option value="Feminino">Feminino</option>
+                  <option value="Outro">Outro</option>
+                  <option value="Prefiro não dizer">Prefiro não dizer</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Telefone</label>
+                <input
+                  type="tel"
+                  value={formData.phone || ''}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={formData.email || ''}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* Location */}
+          <section>
+            <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Localização</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Bairro</label>
+                <input
+                  type="text"
+                  value={formData.neighborhood || ''}
+                  onChange={(e) => setFormData({ ...formData, neighborhood: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Localidade</label>
+                <input
+                  type="text"
+                  value={formData.locality || ''}
+                  onChange={(e) => setFormData({ ...formData, locality: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-slate-700 mb-1">Endereço</label>
+                <input
+                  type="text"
+                  value={formData.address || ''}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* Family & Social Context */}
+          <section>
+            <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Contexto Familiar e Social</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Tamanho da Família</label>
+                <input
+                  type="number"
+                  value={formData.family_size || ''}
+                  onChange={(e) => setFormData({ ...formData, family_size: parseInt(e.target.value) })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Dependentes</label>
+                <input
+                  type="number"
+                  value={formData.dependents || ''}
+                  onChange={(e) => setFormData({ ...formData, dependents: parseInt(e.target.value) })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Escolaridade</label>
+                <select
+                  value={formData.education_level || ''}
+                  onChange={(e) => setFormData({ ...formData, education_level: e.target.value as any })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Selecione</option>
+                  <option value="Sem escolaridade">Sem escolaridade</option>
+                  <option value="Ensino Fundamental">Ensino Fundamental</option>
+                  <option value="Ensino Médio">Ensino Médio</option>
+                  <option value="Ensino Superior">Ensino Superior</option>
+                  <option value="Pós-graduação">Pós-graduação</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Renda Mensal (MZN)</label>
+                <input
+                  type="number"
+                  value={formData.monthly_income || ''}
+                  onChange={(e) => setFormData({ ...formData, monthly_income: parseFloat(e.target.value) })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* Health & Vulnerability */}
+          <section>
+            <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Saúde e Vulnerabilidade</h4>
+            <div className="space-y-4">
+              <div>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={formData.has_disability || false}
+                    onChange={(e) => setFormData({ ...formData, has_disability: e.target.checked })}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium text-slate-700">Possui Deficiência</span>
+                </label>
+              </div>
+              {formData.has_disability && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de Deficiência</label>
+                  <select
+                    value={formData.disability_type || ''}
+                    onChange={(e) => setFormData({ ...formData, disability_type: e.target.value as any })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Selecione</option>
+                    <option value="Física">Física</option>
+                    <option value="Visual">Visual</option>
+                    <option value="Auditiva">Auditiva</option>
+                    <option value="Intelectual">Intelectual</option>
+                    <option value="Múltipla">Múltipla</option>
+                    <option value="Outra">Outra</option>
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Condição de Saúde</label>
+                <textarea
+                  value={formData.health_condition || ''}
+                  onChange={(e) => setFormData({ ...formData, health_condition: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Situação</label>
+                <select
+                  value={formData.situation || ''}
+                  onChange={(e) => setFormData({ ...formData, situation: e.target.value as any })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                >
+                  <option value="Estável">Estável</option>
+                  <option value="Moderada">Moderada</option>
+                  <option value="Crítica">Crítica</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">História Social</label>
+                <textarea
+                  value={formData.social_history || ''}
+                  onChange={(e) => setFormData({ ...formData, social_history: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* Employment & Action */}
+          <section>
+            <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Emprego e Ação</h4>
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Status de Emprego</label>
+                <select
+                  value={formData.employment_status || ''}
+                  onChange={(e) => setFormData({ ...formData, employment_status: e.target.value as any })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                >
+                  <option value="Empregado">Empregado</option>
+                  <option value="Desempregado">Desempregado</option>
+                  <option value="Autônomo">Autônomo</option>
+                  <option value="Aposentado">Aposentado</option>
+                  <option value="Estudante">Estudante</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Ajuda Necessária</label>
+                <textarea
+                  value={formData.help_needed || ''}
+                  onChange={(e) => setFormData({ ...formData, help_needed: e.target.value })}
+                  rows={2}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Encaminhamento</label>
+                <textarea
+                  value={formData.referral || ''}
+                  onChange={(e) => setFormData({ ...formData, referral: e.target.value })}
+                  rows={2}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* Actions */}
+          <div className="flex gap-3 pt-4 border-t border-slate-200">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors font-medium"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSaving ? 'Salvando...' : 'Salvar Alterações'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
