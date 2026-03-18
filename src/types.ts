@@ -137,6 +137,7 @@ export interface FormValues {
   
   // System - Optional for admin, required for providers
   agentId?: string;
+  agentName?: string;
   stationId?: string;
   adminNotes?: string;
 }

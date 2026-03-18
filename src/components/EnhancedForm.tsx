@@ -5,7 +5,7 @@ import * as z from 'zod';
 import { motion } from 'motion/react';
 import {
   Users, ShieldAlert, Activity, PlusCircle, Phone, Mail,
-  Building2, GraduationCap, DollarSign, Calendar
+  Building2, GraduationCap, DollarSign, Calendar, User
 } from 'lucide-react';
 import { format, differenceInYears, parseISO } from 'date-fns';
 import { clsx, type ClassValue } from 'clsx';
@@ -52,6 +52,7 @@ const enhancedRecordSchema = z.object({
   
   // System - Optional for admin, required for providers
   agentId: z.string().optional(),
+  agentName: z.string().optional(),
   stationId: z.string().optional(),
   adminNotes: z.string().optional(),
 });
@@ -168,8 +169,17 @@ export default function EnhancedForm({ onSubmit }: EnhancedFormProps) {
       } else {
         // Provider: Must have station and agent
         payload.provider_id = user?.id || '';
-        payload.agent_id = data.agentId;
         payload.station_id = data.stationId;
+        
+        // Handle agent selection - either from dropdown or manual input
+        if (data.agentId) {
+          // Agent selected from dropdown
+          payload.agent_id = data.agentId;
+        } else if (data.agentName) {
+          // Agent name entered manually - store in admin_notes for now
+          // In the future, you might want to create the agent automatically
+          payload.admin_notes = `Agente responsável (manual): ${data.agentName}`;
+        }
       }
 
       await createRecord(payload);
@@ -561,54 +571,88 @@ export default function EnhancedForm({ onSubmit }: EnhancedFormProps) {
               </div>
             ) : (
               // Provider: Must select station and agent
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Posto de Atendimento *</label>
-                  <select
-                    {...register('stationId', { required: user?.role === 'provider' ? 'Posto obrigatório' : false })}
-                    className={cn(
-                      "w-full px-4 py-2.5 rounded-xl border bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 outline-none transition-all",
-                      errors.stationId ? "border-red-300" : "border-slate-200"
-                    )}
-                  >
-                    <option value="">Selecione...</option>
-                    {stations.map(station => (
-                      <option key={station.id} value={station.id}>
-                        {station.name} - {station.locality}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.stationId && <p className="text-xs text-red-500">{String(errors.stationId.message)}</p>}
-                  {stations.length === 0 && user?.role === 'provider' && (
-                    <p className="text-xs text-amber-600 mt-1">
-                      Você não tem postos atribuídos. Contacte o administrador ou crie um posto na aba "Postos".
+              <div className="space-y-4">
+                {/* Provider Info */}
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <User size={16} className="text-emerald-600" />
+                    <p className="text-sm font-medium text-emerald-900">
+                      Provedor Responsável
                     </p>
-                  )}
+                  </div>
+                  <p className="text-sm font-semibold text-emerald-800">
+                    {user?.full_name || 'Provedor'}
+                  </p>
+                  <p className="text-xs text-emerald-700 mt-1">
+                    Você está fazendo este registro como: {user?.email}
+                  </p>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Agente Responsável *</label>
-                  <select
-                    {...register('agentId', { required: user?.role === 'provider' ? 'Agente obrigatório' : false })}
-                    className={cn(
-                      "w-full px-4 py-2.5 rounded-xl border bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 outline-none transition-all",
-                      errors.agentId ? "border-red-300" : "border-slate-200"
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-500 uppercase">Posto de Atendimento *</label>
+                    <select
+                      {...register('stationId', { required: user?.role === 'provider' ? 'Posto obrigatório' : false })}
+                      className={cn(
+                        "w-full px-4 py-2.5 rounded-xl border bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 outline-none transition-all",
+                        errors.stationId ? "border-red-300" : "border-slate-200"
+                      )}
+                    >
+                      <option value="">Selecione...</option>
+                      {stations.map(station => (
+                        <option key={station.id} value={station.id}>
+                          {station.name} - {station.locality}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.stationId && <p className="text-xs text-red-500">{String(errors.stationId.message)}</p>}
+                    {stations.length === 0 && user?.role === 'provider' && (
+                      <p className="text-xs text-amber-600 mt-1">
+                        Você não tem postos atribuídos. Contacte o administrador ou crie um posto na aba "Postos".
+                      </p>
                     )}
-                    disabled={!selectedStationId}
-                  >
-                    <option value="">Selecione...</option>
-                    {agents.map(agent => (
-                      <option key={agent.id} value={agent.id}>
-                        {agent.name} ({agent.badge_number})
-                      </option>
-                    ))}
-                  </select>
-                  {errors.agentId && <p className="text-xs text-red-500">{String(errors.agentId.message)}</p>}
-                  {selectedStationId && agents.length === 0 && (
-                    <p className="text-xs text-amber-600 mt-1">
-                      Nenhum agente cadastrado para este posto. Vá em "Postos" para adicionar agentes.
-                    </p>
-                  )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-500 uppercase">Agente Responsável *</label>
+                    {selectedStationId && agents.length > 0 ? (
+                      // Show dropdown if agents exist
+                      <select
+                        {...register('agentId', { required: user?.role === 'provider' ? 'Agente obrigatório' : false })}
+                        className={cn(
+                          "w-full px-4 py-2.5 rounded-xl border bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 outline-none transition-all",
+                          errors.agentId ? "border-red-300" : "border-slate-200"
+                        )}
+                      >
+                        <option value="">Selecione...</option>
+                        {agents.map(agent => (
+                          <option key={agent.id} value={agent.id}>
+                            {agent.name} ({agent.badge_number})
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      // Show text input if no agents exist
+                      <input
+                        {...register('agentName', {
+                          required: selectedStationId && agents.length === 0 ? 'Nome do agente obrigatório' : false
+                        })}
+                        type="text"
+                        className={cn(
+                          "w-full px-4 py-2.5 rounded-xl border bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 outline-none transition-all",
+                          errors.agentName ? "border-red-300" : "border-slate-200"
+                        )}
+                        placeholder="Digite o nome do agente responsável..."
+                      />
+                    )}
+                    {errors.agentId && <p className="text-xs text-red-500">{String(errors.agentId.message)}</p>}
+                    {errors.agentName && <p className="text-xs text-red-500">{String(errors.agentName.message)}</p>}
+                    {selectedStationId && agents.length === 0 && (
+                      <p className="text-xs text-amber-600 mt-1">
+                        Nenhum agente cadastrado. Digite o nome do agente responsável ou cadastre agentes em "Postos".
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
