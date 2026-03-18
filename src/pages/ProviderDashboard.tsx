@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, getRecords, getStations, getAgents } from '../lib/supabase';
-import { 
+import { supabase, getRecords, getStations, getAgents, createStation } from '../lib/supabase';
+import {
   Users, PlusCircle, BarChart3, Activity, MapPin, ShieldAlert, LogOut,
-  Menu, Clock, Building
+  Menu, Clock, Building, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, parseISO } from 'date-fns';
@@ -32,6 +32,8 @@ export default function ProviderDashboard() {
   const [stations, setStations] = useState<Station[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showStationForm, setShowStationForm] = useState(false);
+  const [isSubmittingStation, setIsSubmittingStation] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -82,6 +84,33 @@ export default function ProviderDashboard() {
   const handleSignOut = async () => {
     await signOut();
     navigate('/login');
+  };
+
+  const handleCreateStation = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!user?.id) return;
+
+    setIsSubmittingStation(true);
+    const formData = new FormData(e.currentTarget);
+
+    try {
+      await createStation({
+        name: formData.get('name') as string,
+        address: formData.get('address') as string || undefined,
+        neighborhood: formData.get('neighborhood') as string,
+        locality: formData.get('locality') as string,
+        provider_id: user.id,
+      });
+
+      setShowStationForm(false);
+      (e.target as HTMLFormElement).reset();
+      await loadData();
+    } catch (error) {
+      console.error('Failed to create station:', error);
+      alert('Erro ao criar posto. Tente novamente.');
+    } finally {
+      setIsSubmittingStation(false);
+    }
   };
 
   const stats = {
@@ -307,32 +336,154 @@ export default function ProviderDashboard() {
             )}
 
             {activeTab === 'stations' && (
-              <motion.div 
+              <motion.div
                 key="stations"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+                className="space-y-6"
               >
-                {stations.map((station) => (
-                  <div key={station.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-                    <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-500 flex items-center justify-center mb-4">
-                      <MapPin size={24} />
+                {/* Create Station Button */}
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => setShowStationForm(true)}
+                    className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-xl transition-all flex items-center gap-2"
+                  >
+                    <PlusCircle size={18} />
+                    Novo Posto
+                  </button>
+                </div>
+
+                {/* Create Station Form */}
+                {showStationForm && (
+                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                    <div className="flex items-center justify-between mb-6">
+                      <h4 className="text-lg font-bold text-slate-900">Cadastrar Novo Posto</h4>
+                      <button
+                        onClick={() => setShowStationForm(false)}
+                        className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                      >
+                        <X size={20} />
+                      </button>
                     </div>
-                    <h4 className="text-lg font-bold text-slate-900 mb-2">{station.name}</h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center gap-2 text-slate-600">
-                        <MapPin size={14} className="text-slate-400" />
-                        <span>{station.neighborhood}, {station.locality}</span>
-                      </div>
-                      {station.address && (
-                        <div className="text-slate-500 text-xs truncate">
-                          {station.address}
+
+                    <form onSubmit={handleCreateStation} className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-slate-500 uppercase">Nome do Posto *</label>
+                          <input
+                            name="name"
+                            type="text"
+                            required
+                            disabled={isSubmittingStation}
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all disabled:opacity-50"
+                            placeholder="Ex: CRAS Central"
+                          />
                         </div>
-                      )}
-                    </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-slate-500 uppercase">Bairro *</label>
+                          <input
+                            name="neighborhood"
+                            type="text"
+                            required
+                            disabled={isSubmittingStation}
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all disabled:opacity-50"
+                            placeholder="Ex: Centro"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-slate-500 uppercase">Localidade *</label>
+                          <input
+                            name="locality"
+                            type="text"
+                            required
+                            disabled={isSubmittingStation}
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all disabled:opacity-50"
+                            placeholder="Ex: Zona 1"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-slate-500 uppercase">Endereço</label>
+                          <input
+                            name="address"
+                            type="text"
+                            disabled={isSubmittingStation}
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all disabled:opacity-50"
+                            placeholder="Rua, número, referência..."
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 pt-4">
+                        <button
+                          type="submit"
+                          disabled={isSubmittingStation}
+                          className="flex-1 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300 text-white font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2"
+                        >
+                          {isSubmittingStation ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              Salvando...
+                            </>
+                          ) : (
+                            <>
+                              <PlusCircle size={18} />
+                              Criar Posto
+                            </>
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowStationForm(false)}
+                          disabled={isSubmittingStation}
+                          className="px-6 py-3 border border-slate-200 text-slate-600 font-medium rounded-xl hover:bg-slate-50 transition-all disabled:opacity-50"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </form>
                   </div>
-                ))}
+                )}
+
+                {/* Stations Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {stations.map((station) => (
+                    <div key={station.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                      <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-500 flex items-center justify-center mb-4">
+                        <MapPin size={24} />
+                      </div>
+                      <h4 className="text-lg font-bold text-slate-900 mb-2">{station.name}</h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-center gap-2 text-slate-600">
+                          <MapPin size={14} className="text-slate-400" />
+                          <span>{station.neighborhood}, {station.locality}</span>
+                        </div>
+                        {station.address && (
+                          <div className="text-slate-500 text-xs truncate">
+                            {station.address}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {stations.length === 0 && !showStationForm && (
+                    <div className="col-span-full bg-white rounded-2xl border border-slate-200 shadow-sm p-12 text-center">
+                      <MapPin size={48} className="mx-auto text-slate-300 mb-4" />
+                      <h4 className="text-lg font-semibold text-slate-700 mb-2">Nenhum posto cadastrado</h4>
+                      <p className="text-sm text-slate-500 mb-6">Comece criando seu primeiro posto de atendimento</p>
+                      <button
+                        onClick={() => setShowStationForm(true)}
+                        className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-xl transition-all inline-flex items-center gap-2"
+                      >
+                        <PlusCircle size={18} />
+                        Criar Primeiro Posto
+                      </button>
+                    </div>
+                  )}
+                </div>
               </motion.div>
             )}
 
