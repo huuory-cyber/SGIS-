@@ -310,6 +310,46 @@ export async function reactivateProvider(userId: string) {
   return data;
 }
 
+// Create provider directly (admin only) - creates provider as already approved
+export async function createProviderDirectly(email: string, password: string, fullName: string, adminId: string) {
+  // Create auth user
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        full_name: fullName,
+        role: 'provider',
+      }
+    }
+  });
+
+  if (error) throw error;
+
+  // Create profile with approved status
+  if (data.user) {
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .insert({
+        id: data.user.id,
+        email: data.user.email!,
+        full_name: fullName,
+        role: 'provider',
+        is_active: true,
+        approval_status: 'approved',
+        approved_by: adminId,
+        approved_at: new Date().toISOString()
+      });
+
+    if (profileError) {
+      console.error('Erro ao criar perfil:', profileError);
+      throw profileError;
+    }
+  }
+
+  return data;
+}
+
 // Stations management
 export async function getStations(providerId?: string) {
   let query = supabase
