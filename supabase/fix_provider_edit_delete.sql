@@ -1,4 +1,4 @@
--- 🔧 CORREÇÃO DAS POLÍTICAS RLS - PROVEDORES PODEREM EDITAR E APAGAR REGISTROS
+-- 🔧 CORREÇÃO DAS POLÍTICAS RLS - PROVEDORES E ADMINISTRADORES
 -- Execute este SQL no Supabase SQL Editor para corrigir as políticas RLS
 
 -- 1. Remover políticas existentes de social_records que podem estar causando problemas
@@ -10,10 +10,11 @@ DROP POLICY IF EXISTS "Admins can view all records" ON public.social_records;
 DROP POLICY IF EXISTS "Admins can insert records" ON public.social_records;
 DROP POLICY IF EXISTS "Admins can update all records" ON public.social_records;
 DROP POLICY IF EXISTS "Admins can delete all records" ON public.social_records;
+DROP POLICY IF EXISTS "Approved providers can insert records" ON public.social_records;
 
 -- 2. Criar políticas corretas para social_records
 
--- SELECT: Provedores aprovados podem ver seus próprios registros
+-- SELECT: Provedores aprovados podem ver seus próprios registros, admins podem ver todos
 CREATE POLICY "Approved providers can view their own records"
   ON public.social_records FOR SELECT
   USING (
@@ -22,16 +23,19 @@ CREATE POLICY "Approved providers can view their own records"
     (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'
   );
 
--- INSERT: Provedores aprovados podem inserir seus próprios registros
-CREATE POLICY "Approved providers can insert their own records"
+-- INSERT: Provedores aprovados podem inserir seus próprios registros, admins podem inserir registros
+CREATE POLICY "Users can insert records"
   ON public.social_records FOR INSERT
   WITH CHECK (
-    provider_id = auth.uid() AND
-    (SELECT approval_status FROM public.profiles WHERE id = auth.uid()) = 'approved'
+    -- Provedor aprovado: deve inserir com seu próprio provider_id
+    (provider_id = auth.uid() AND
+     (SELECT approval_status FROM public.profiles WHERE id = auth.uid()) = 'approved') OR
+    -- Admin: pode inserir com qualquer provider_id (inclusive o seu próprio)
+    ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin')
   );
 
--- UPDATE: Provedores aprovados podem atualizar seus próprios registros
-CREATE POLICY "Approved providers can update their own records"
+-- UPDATE: Provedores aprovados podem atualizar seus próprios registros, admins podem atualizar todos
+CREATE POLICY "Users can update records"
   ON public.social_records FOR UPDATE
   USING (
     (provider_id = auth.uid() AND
@@ -44,8 +48,8 @@ CREATE POLICY "Approved providers can update their own records"
     (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'
   );
 
--- DELETE: Provedores aprovados podem deletar seus próprios registros
-CREATE POLICY "Approved providers can delete their own records"
+-- DELETE: Provedores aprovados podem deletar seus próprios registros, admins podem deletar todos
+CREATE POLICY "Users can delete records"
   ON public.social_records FOR DELETE
   USING (
     (provider_id = auth.uid() AND
